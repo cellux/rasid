@@ -140,7 +140,7 @@ local Pattern = util.Class()
 function Pattern:iter()
    local iters = {}
    for k,v in pairs(self) do
-      if k ~= "template" then
+      if k:sub(1,1) ~= "_" then
          iters[k] = iter(v)
       end
    end
@@ -149,7 +149,7 @@ function Pattern:iter()
       for k,i in pairs(iters) do
          e[k] = i()
       end
-      return self.template:extend(e)
+      return self._template:extend(e)
    end
 end
 
