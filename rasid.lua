@@ -62,49 +62,84 @@ function R.note(note)
    return note
 end
 
-local function iter(x)
-   if type(x) == "table" then
-      if type(x.iter) == "function" then
-         return x:iter()
-      else
-         local i = 1
-         return function()
-            local rv
-            if i <= #x then
-               rv = x[i]
-               i = i + 1
-            else
-               rv = nil
+local function is_iter(x)
+   -- not the best check but good enough for now
+   return type(x) == "function"
+end
+
+local function iter_array(t, n)
+   local i = 1
+   if n then
+      return function()
+         local rv
+         if i > #t and n > 0 then
+            i = 1
+            n = n - 1
+         end
+         if i <= #t then
+            rv = t[i]
+            i = i + 1
+         else
+            rv = nil
+         end
+         return rv
+      end
+   else
+      return function()
+         local rv
+         if i <= #t then
+            rv = t[i]
+            i = i + 1
+            if i > #t then
+               i = 1
             end
-            return rv
+         else
+            rv = nil
+         end
+         return rv
+      end
+   end
+end
+
+local function iter_value(x, n)
+   if n then
+      return function()
+         if n == 0 then
+            return nil
+         else
+            n = n - 1
+            return x
          end
       end
-   elseif type(x) == "function" then
+   else
+      return function()
+         return x
+      end
+   end
+end
+
+local function iter(x, n)
+   -- n == nil: repeat forever, n > 0: repeat N times
+   if type(x) == "table" then
+      if type(x.iter) == "function" then
+         return x:iter(n)
+      else
+         return iter_array(x, n)
+      end
+   elseif is_iter(x) then
       return x
    else
-      return function() return x end
+      return iter_value(x, n)
    end
 end
 
-function R.loop(x)
-   local i = iter(x)
-   local values = {}
-   local consumed = false
-   return function()
-      local next_val = i()
-      if next_val == nil then
-         i = iter(values)
-         next_val = i()
-         consumed = true
-      end
-      if not consumed then
-         table.insert(values, next_val)
-      end
-      return next_val
-   end
+local Iterable = util.Class()
+
+function Iterable:iter(n)
+   return iter_value(self, n)
 end
 
-local Scale = util.Class()
+local Scale = util.Class(Iterable)
 
 function Scale:create(steps)
    local self = {
@@ -135,27 +170,7 @@ R.scales = {
    minor = Scale { 2,1,2,2,1,2,2 },
 }
 
-local Pattern = util.Class()
-
-function Pattern:iter()
-   local iters = {}
-   for k,v in pairs(self) do
-      if k:sub(1,1) ~= "_" then
-         iters[k] = iter(v)
-      end
-   end
-   return function()
-      local e = {}
-      for k,i in pairs(iters) do
-         e[k] = i()
-      end
-      return self._template:extend(e)
-   end
-end
-
-R.Pattern = Pattern
-
-local Event = util.Class()
+local Event = util.Class(Iterable)
 
 function Event:create(opts)
    opts = opts or {}
@@ -164,8 +179,9 @@ function Event:create(opts)
    return opts
 end
 
-function Event:play(channel)
-   local note, root, scale, degree, shift, transpose
+function Event:play()
+   local channel, note, root, scale, degree, shift, transpose
+   channel = self.channel
    note = self.note
    if not note then
       root = self.root or R.ROOT
@@ -240,21 +256,56 @@ local function parse_ticks(ticks)
    end
 end
 
-function R.play(opts)
-   local i_tick = iter(parse_ticks(opts.ticks))
-   local i_event = iter(opts.events)
+local Pattern = util.Class()
+
+function Pattern:create(opts)
+   local self = {
+      ticks = parse_ticks(opts.ticks),
+      rep = opts.rep or 1,
+      bpt = opts.bpt or 1,
+      events = opts.events or {},
+   }
+   self.length = opts.length or self.rep * #self.ticks
+   return self
+end
+
+function Pattern:event_iter()
+   local iters = {}
+   for k,v in pairs(self.events) do
+      iters[k] = iter(v)
+   end
+   return function()
+      local opts = {}
+      for k,i in pairs(iters) do
+         opts[k] = i()
+      end
+      if opts.template then
+         return opts.template:extend(opts)
+      else
+         return Event(opts)
+      end
+   end
+end
+
+function Pattern:play()
+   local length = self.length
+   local i_tick = iter(self.ticks)
+   local i_bpt = iter(self.bpt)
+   local i_event = self:event_iter()
    sched(function()
-      while true do
-         local tick = i_tick()
-         if tick == nil then
-            break
-         elseif tick then
-            local event = i_event()
-            event:play(opts.channel)
+      for i=1,length do
+         if i_tick() then
+            i_event():play()
          end
-         R.wait(opts.bpt or 1)
+         R.wait(i_bpt())
       end
    end)
+end
+
+R.Pattern = Pattern
+
+function R.play(opts)
+   Pattern(opts):play()
 end
 
 local mixer = audio.Mixer()
@@ -329,6 +380,9 @@ function FluidSynth:channel(chan)
    defproxy("channel_pressure")
    defproxy("all_notes_off")
    defproxy("all_sounds_off")
+   function channel:iter()
+      return iter_value(self)
+   end
    return channel
 end
 
