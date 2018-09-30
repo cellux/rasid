@@ -8,7 +8,6 @@ fluidr3 = synth:sfload("/usr/share/soundfonts/fluidr3/FluidR3GM.SF2")
 space_disco_bassline = R.Pattern {
    ticks = "1.11.111",
    bpt = 1/4,
-   template = template,
    events = {
       synth = synth,
       sfont = fluidr3,
@@ -86,8 +85,17 @@ space_disco_bassline:set("bpt", 1/2)
 space_disco_bassline:set("bpt", 1/3)
 space_disco_bassline:set("bpt", 1/4)
 
-space_disco_bassline_forever = R.Pattern {
-   patterns = { space_disco_bassline },
+space_disco = R.Pattern {
+   patterns = {
+      main = {
+         space_disco_bassline,
+         space_disco_bassline:extend{ program = 20 },
+         space_disco_bassline:extend{ program = 35, rep = 2 },
+         space_disco_bassline:extend{ program = 38 },
+      }
+   }
 }
+R.play_forever(space_disco)
+R.stop(space_disco)
 
 synth:all_notes_off(0)

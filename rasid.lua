@@ -84,11 +84,13 @@ end
 local function ArrayIterator(array, n)
    local self = { is_iter = true }
    local max_index = n and (n * #array)
-   function self:at(index)
+   function self:at(index, wrap)
       if max_index and index > max_index then
          return nil
-      else
+      elseif wrap then
          index = ((index - 1) % #array) + 1
+         return array[index]
+      elseif index <= #array then
          return array[index]
       end
    end
@@ -101,14 +103,14 @@ end
 
 local function iter(x, n)
    -- n == nil: repeat forever, n > 0: repeat N times
-   if type(x) == "table" then
+   if is_iter(x) then
+      return x
+   elseif type(x) == "table" then
       if type(x.iter) == "function" then
          return x:iter(n)
       else
          return ArrayIterator(x, n)
       end
-   elseif is_iter(x) then
-      return x
    else
       return ValueIterator(x, n)
    end
@@ -157,6 +159,22 @@ function Event:create(opts)
    opts = opts or {}
    opts.root = opts.root and R.note(opts.root)
    return opts
+end
+
+function Event:clone()
+   local opts = {}
+   for k,v in pairs(self) do
+      opts[k] = v
+   end
+   return Event(opts)
+end
+
+function Event:extend(opts)
+   local e = self:clone()
+   for k,v in pairs(opts) do
+      e[k] = v
+   end
+   return e
 end
 
 function Event:play()
@@ -208,22 +226,6 @@ function Event:play()
    end)
 end
 
-function Event:clone()
-   local opts = {}
-   for k,v in pairs(self) do
-      opts[k] = v
-   end
-   return Event(opts)
-end
-
-function Event:extend(opts)
-   local e = self:clone()
-   for k,v in pairs(opts) do
-      e[k] = v
-   end
-   return e
-end
-
 R.Event = Event
 
 local function parse_ticks(ticks)
@@ -243,11 +245,13 @@ local function parse_ticks(ticks)
    end
 end
 
-local Pattern = util.Class()
+local Pattern = util.Class(Iterable)
 
 function Pattern:create(opts)
+   opts = opts or {}
    local self = {
       is_pattern = true,
+      rep = opts.rep or 1,
    }
    local function setup_iters(source)
       self.iters = {}
@@ -255,15 +259,36 @@ function Pattern:create(opts)
          self.iters[k] = iter(v)
       end
    end
-   if opts.ticks then
+   if opts.ticks and opts.events then
       self.i_tick = iter(parse_ticks(opts.ticks))
       self.length = #opts.ticks
       self.i_bpt = iter(opts.bpt or 1)
       setup_iters(opts.events)
-   else
+   elseif opts.patterns then
       setup_iters(opts.patterns)
    end
    return self
+end
+
+function Pattern:clone()
+   local p = Pattern()
+   p.rep = self.rep
+   p.iters = {}
+   for k,v in pairs(self.iters) do
+      p.iters[k] = v
+   end
+   p.i_tick = self.i_tick
+   p.length = self.length
+   p.i_bpt = self.i_bpt
+   return p
+end
+
+function Pattern:extend(opts)
+   local p = self:clone()
+   for k,v in pairs(opts) do
+      p:set(k, v)
+   end
+   return p
 end
 
 function Pattern:set(k, v)
@@ -272,6 +297,8 @@ function Pattern:set(k, v)
    elseif k == "ticks" then
       self.i_tick = iter(parse_ticks(v))
       self.length = #v
+   elseif k == "rep" then
+      self.rep = v
    else
       self.iters[k] = iter(v)
    end
@@ -279,10 +306,10 @@ end
 
 local function EventIterator(iters)
    local self = { is_iter = true }
-   function self:at(index)
+   function self:at(index, wrap)
       local opts = {}
       for k,i in pairs(iters) do
-         opts[k] = i:at(index)
+         opts[k] = i:at(index, wrap)
       end
       return Event(opts)
    end
@@ -293,17 +320,19 @@ function Pattern:play_events(forever)
    self.playing = true
    local i_event = EventIterator(self.iters)
    local event_index = 0
+   local wrap = true
    while self.playing do
-      for i=1,self.length do
+      local length = self.length * self.rep
+      for i=1,length do
          if not self.playing then
             break
          end
-         if self.i_tick:at(i) then
+         if self.i_tick:at(i, wrap) then
             event_index = event_index + 1
-            local event = i_event:at(event_index)
+            local event = i_event:at(event_index, wrap)
             event:play()
          end
-         R.wait(self.i_bpt:at(i))
+         R.wait(self.i_bpt:at(i, wrap))
       end
       if not forever then
          break
@@ -313,18 +342,21 @@ end
 
 function Pattern:play_patterns(forever)
    self.playing = true
+   local wrap = forever
    while self.playing do
       local threads = {}
       for name,i_pattern in pairs(self.iters) do
          local function player()
-            local i = 1
-            repeat
-               local pattern = i_pattern:at(i)
-               if pattern then
-                  pattern:play()
-               end
-               i = i + 1
-            until not pattern
+            for i=1,self.rep do
+               local pattern_index = 1
+               repeat
+                  local pattern = i_pattern:at(pattern_index, wrap)
+                  if pattern then
+                     pattern:play()
+                  end
+                  pattern_index = pattern_index + 1
+               until not self.playing or not pattern
+            end
          end
          table.insert(threads, sched(player))
       end
