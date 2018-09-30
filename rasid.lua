@@ -319,6 +319,16 @@ function R.play(pattern)
    end)
 end
 
+function R.play_forever(pattern)
+   assert(is_pattern(pattern))
+   sched(function()
+     pattern:play()
+     while pattern.playing do
+        pattern:play()
+     end
+   end)
+end
+
 function R.stop(pattern)
    assert(is_pattern(pattern))
    pattern:stop()
