@@ -170,52 +170,57 @@ R.scales = {
    minor = Scale { 2,1,2,2,1,2,2 },
 }
 
+local Chord = util.Class(Iterable)
+
+R.Chord = Chord
+
 local Event = util.Class(Iterable)
 
 function Event:create(opts)
    opts = opts or {}
-   opts.note = opts.note and R.note(opts.note)
    opts.root = opts.root and R.note(opts.root)
    return opts
 end
 
 function Event:play()
-   local channel, note, root, scale, degree, shift, transpose
+   local channel, bank, program
+   local root, scale, degree, shift, transpose, chord, dur, vel
    channel = self.channel
-   note = self.note
-   if not note then
-      root = self.root or R.ROOT
-      scale = self.scale or R.scales.major
-      degree = self.degree or 0
-      shift = self.shift or 0
-      transpose = self.transpose or 0
-      if type(degree) == "table" then
-         note = {}
-         for i=1,#degree do
-            table.insert(note, root + scale:at(degree[i] + shift) + transpose)
-         end
-      else
-         note = root + scale:at(degree + shift) + transpose
-      end
-   end
+   bank = self.bank
+   program = self.program
+   root = self.root or R.ROOT
+   scale = self.scale or R.scales.major
+   degree = self.degree or 0
+   shift = self.shift or 0
+   transpose = self.transpose or 0
+   chord = self.chord
    dur = self.dur
    vel = self.vel or R.VEL
+   local notes = {}
+   if chord then
+      for i=1,#chord do
+         local chord_shift = chord[i]
+         local scale_index = degree + shift + chord_shift
+         table.insert(notes, root + scale:at(scale_index) + transpose)
+      end
+   else
+      local scale_index = degree + shift
+      table.insert(notes, root + scale:at(scale_index) + transpose)
+   end
    sched(function()
-       if type(note) == "table" then
-          for i=1,#note do
-             channel:noteon(note[i], vel)
-          end
-       else
-          channel:noteon(note, vel)
+       if bank then
+          channel:bank(bank)
+       end
+       if program then
+          channel:program(program)
+       end
+       for i=1,#notes do
+          channel:noteon(notes[i], vel)
        end
        if dur then
           R.wait(dur)
-          if type(note) == "table" then
-             for i=1,#note do
-                channel:noteoff(note[i])
-             end
-          else
-             channel:noteoff(note)
+          for i=1,#notes do
+             channel:noteoff(notes[i])
           end
        end
    end)
