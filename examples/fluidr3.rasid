@@ -1,0 +1,49 @@
+R.BPM = 133
+R.VEL = 60
+
+synth = R.FluidSynth()
+
+fluidr3 = synth:sfload("/usr/share/soundfonts/fluidr3/FluidR3GM.SF2")
+
+do return end
+
+-- set the controls for the heart of the sun
+
+space_disco_bassline = R.Pattern {
+   ticks = "1.11.111",
+   bpt = 1/4,
+   events = {
+      synth = synth,
+      sfont = fluidr3,
+      channel = 0,
+      bank = 0,
+      program = 38,
+      root = "c4",
+      scale = R.scales.minor,
+      dur = {.5, .5, 1, .5 },
+      transpose = -20,
+      degree = { 0, 4, 2 },
+      chord = R.Chord{0,2,4},
+      vel = { 60, 40 },
+   }
+}
+R.play_forever(space_disco_bassline)
+R.stop(space_disco_bassline)
+
+-- some programs to try:
+--
+-- 2, 4, 5, 12, 18, 20, 22, 24, 26, 28, 32, 33, 35, 38
+-- 45, 46, 53, 54, 56, 57, 58, 59, 64, 66, 68, 69, 70, 76,
+-- 90, 105, 106, 107, 108, 109, 110, 116
+space_disco_bassline:set("program", 38)
+space_disco_bassline:set("program", 12)
+space_disco_bassline:set("root", R.note("c4"))
+space_disco_bassline:set("chord", R.Chord{0,2,4})
+space_disco_bassline:set("degree", {0, 4, 2})
+space_disco_bassline:set("degree", {4, 2, 6})
+
+space_disco_bassline_forever = R.Pattern {
+   patterns = { space_disco_bassline },
+}
+
+synth:all_notes_off(0)
