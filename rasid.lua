@@ -179,9 +179,11 @@ function Event:create(opts)
 end
 
 function Event:play()
-   local channel, bank, program
+   local synth, sfont, channel, bank, program
    local root, scale, degree, shift, transpose, chord, dur, vel
-   channel = self.channel
+   synth = self.synth
+   sfont = self.sfont
+   channel = self.channel or 0
    bank = self.bank
    program = self.program
    root = self.root or R.ROOT
@@ -204,19 +206,22 @@ function Event:play()
       table.insert(notes, root + scale:at(scale_index) + transpose)
    end
    sched(function()
+       if sfont then
+          synth:sfont(channel, sfont)
+       end
        if bank then
-          channel:bank(bank)
+          synth:bank(channel, bank)
        end
        if program then
-          channel:program(program)
+          synth:program(channel, program)
        end
        for i=1,#notes do
-          channel:noteon(notes[i], vel)
+          synth:noteon(channel, notes[i], vel)
        end
        if dur then
           R.wait(dur)
           for i=1,#notes do
-             channel:noteoff(notes[i])
+             synth:noteoff(channel, notes[i])
           end
        end
    end)
@@ -319,7 +324,7 @@ end
 
 local mixer = audio.Mixer()
 
-local SoundFont = util.Class()
+local SoundFont = util.Class(Iterable)
 
 function SoundFont:create(synth, sfont_id)
    return {
@@ -328,14 +333,14 @@ function SoundFont:create(synth, sfont_id)
    }
 end
 
-local FluidSynth = util.Class()
+local FluidSynth = util.Class(Iterable)
 
 function FluidSynth:create(settings)
    local self = {}
    if not settings then
       settings = fluid.Settings()
       settings:setnum("synth.gain", 1)
-      settings:setint("synth.midi-channels", 256)
+      settings:setint("synth.midi-channels", 1024)
       settings:setnum("synth.sample-rate", R.SAMPLE_RATE)
    end
    local synth = fluid.Synth(settings)
@@ -354,32 +359,35 @@ function FluidSynth:sfload(...)
    return SoundFont(self, sfont_id)
 end
 
-function FluidSynth:channel(chan)
-   local synth = self.synth
-   local channel = {}
-   function channel:sfont(sfont)
-      synth:sfont_select(chan, sfont.sfont_id)
-      return self
-   end
-   function channel:bank(bank)
-      synth:bank_select(chan, bank)
-      return self
-   end
-   function channel:program(program)
-      synth:program_change(chan, program)
-      return self
-   end
-   function channel:noteon(key, vel)
-      synth:noteon(chan, R.note(key), vel or R.VEL)
-      return self
-   end
-   function channel:noteoff(key)
-      synth:noteoff(chan, R.note(key))
-      return self
-   end
+function FluidSynth:sfont(chan, sfont)
+   self.synth:sfont_select(chan, sfont.sfont_id)
+   return self
+end
+
+function FluidSynth:bank(chan, bank)
+   self.synth:bank_select(chan, bank)
+   return self
+end
+
+function FluidSynth:program(chan, program)
+   self.synth:program_change(chan, program)
+   return self
+end
+
+function FluidSynth:noteon(chan, key, vel)
+   self.synth:noteon(chan, R.note(key), vel or R.VEL)
+   return self
+end
+
+function FluidSynth:noteoff(chan, key)
+   self.synth:noteoff(chan, R.note(key))
+   return self
+end
+
+do
    local function defproxy(name)
-      channel[name] = function(self, ...)
-         synth[name](synth, chan, ...)
+      FluidSynth[name] = function(self, ...)
+         self.synth[name](self.synth, ...)
          return self
       end
    end
@@ -389,10 +397,6 @@ function FluidSynth:channel(chan)
    defproxy("channel_pressure")
    defproxy("all_notes_off")
    defproxy("all_sounds_off")
-   function channel:iter()
-      return iter_value(self)
-   end
-   return channel
 end
 
 R.FluidSynth = FluidSynth
