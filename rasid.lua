@@ -62,60 +62,41 @@ function R.note(note)
    return note
 end
 
-local function is_iter(x)
-   -- not the best check but good enough for now
-   return type(x) == "function"
-end
-
-local function iter_array(t, n)
-   local i = 1
+local function ValueIterator(value, n)
+   local self = { is_iter = true }
    if n then
-      return function()
-         local rv
-         if i > #t and n > 0 then
-            i = 1
+      function self:at()
+         if n > 0 then
             n = n - 1
-         end
-         if i <= #t then
-            rv = t[i]
-            i = i + 1
+            return value
          else
-            rv = nil
-         end
-         return rv
-      end
-   else
-      return function()
-         local rv
-         if i <= #t then
-            rv = t[i]
-            i = i + 1
-            if i > #t then
-               i = 1
-            end
-         else
-            rv = nil
-         end
-         return rv
-      end
-   end
-end
-
-local function iter_value(x, n)
-   if n then
-      return function()
-         if n == 0 then
             return nil
-         else
-            n = n - 1
-            return x
          end
       end
    else
-      return function()
-         return x
+      function self:at()
+         return value
       end
    end
+   return self
+end
+
+local function ArrayIterator(array, n)
+   local self = { is_iter = true }
+   local max_index = n and (n * #array)
+   function self:at(index)
+      if max_index and index > max_index then
+         return nil
+      else
+         index = ((index - 1) % #array) + 1
+         return array[index]
+      end
+   end
+   return self
+end
+
+local function is_iter(x)
+   return type(x) == "table" and x.is_iter
 end
 
 local function iter(x, n)
@@ -124,19 +105,19 @@ local function iter(x, n)
       if type(x.iter) == "function" then
          return x:iter(n)
       else
-         return iter_array(x, n)
+         return ArrayIterator(x, n)
       end
    elseif is_iter(x) then
       return x
    else
-      return iter_value(x, n)
+      return ValueIterator(x, n)
    end
 end
 
 local Iterable = util.Class()
 
 function Iterable:iter(n)
-   return iter_value(self, n)
+   return ValueIterator(self, n)
 end
 
 local Scale = util.Class(Iterable)
@@ -270,21 +251,27 @@ function Pattern:create(opts)
       ticks = parse_ticks(opts.ticks),
       rep = opts.rep or 1,
       bpt = opts.bpt or 1,
-      events = opts.events or {},
    }
+   self.iters = {}
+   if opts.events then
+      for k,v in pairs(opts.events) do
+         self.iters[k] = iter(v)
+      end
+   end
    self.length = opts.length or self.rep * #self.ticks
    return self
 end
 
-function Pattern:event_iter()
-   local iters = {}
-   for k,v in pairs(self.events) do
-      iters[k] = iter(v)
-   end
-   return function()
+function Pattern:set(k, v)
+   self.iters[k] = iter(v)
+end
+
+local function EventIterator(iters)
+   local self = { is_iter = true }
+   function self:at(index)
       local opts = {}
       for k,i in pairs(iters) do
-         opts[k] = i()
+         opts[k] = i:at(index)
       end
       if opts.template then
          return opts.template:extend(opts)
@@ -292,19 +279,31 @@ function Pattern:event_iter()
          return Event(opts)
       end
    end
+   return self
 end
 
 function Pattern:play()
    local length = self.length
    local i_tick = iter(self.ticks)
    local i_bpt = iter(self.bpt)
-   local i_event = self:event_iter()
+   local i_event = EventIterator(self.iters)
+   local event_index = 0
+   self.playing = true
    for i=1,length do
-      if i_tick() then
-         i_event():play()
+      if not self.playing then
+         break
       end
-      R.wait(i_bpt())
+      if i_tick:at(i) then
+         event_index = event_index + 1
+         local event = i_event:at(event_index)
+         event:play()
+      end
+      R.wait(i_bpt:at(i))
    end
+end
+
+function Pattern:stop()
+   self.playing = false
 end
 
 R.Pattern = Pattern
@@ -314,12 +313,15 @@ local function is_pattern(x)
 end
 
 function R.play(pattern)
-   if not is_pattern(pattern) then
-      pattern = Pattern(pattern)
-   end
+   assert(is_pattern(pattern))
    sched(function()
      pattern:play()
    end)
+end
+
+function R.stop(pattern)
+   assert(is_pattern(pattern))
+   pattern:stop()
 end
 
 local mixer = audio.Mixer()
