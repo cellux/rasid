@@ -5,13 +5,10 @@ synth = R.FluidSynth()
 
 fluidr3 = synth:sfload("/usr/share/soundfonts/fluidr3/FluidR3GM.SF2")
 
-do return end
-
--- set the controls for the heart of the sun
-
 space_disco_bassline = R.Pattern {
    ticks = "1.11.111",
    bpt = 1/4,
+   template = template,
    events = {
       synth = synth,
       sfont = fluidr3,
@@ -27,20 +24,67 @@ space_disco_bassline = R.Pattern {
       vel = { 60, 40 },
    }
 }
+
+do return end
+
+-- set the controls for the heart of the sun
+
 R.play_forever(space_disco_bassline)
 R.stop(space_disco_bassline)
 
 -- some programs to try:
---
--- 2, 4, 5, 12, 18, 20, 22, 24, 26, 28, 32, 33, 35, 38
--- 45, 46, 53, 54, 56, 57, 58, 59, 64, 66, 68, 69, 70, 76,
--- 90, 105, 106, 107, 108, 109, 110, 116
-space_disco_bassline:set("program", 38)
+space_disco_bassline:set("program", 2)
+space_disco_bassline:set("program", 4)
+space_disco_bassline:set("program", 5)
 space_disco_bassline:set("program", 12)
+space_disco_bassline:set("program", 18)
+space_disco_bassline:set("program", 20)
+space_disco_bassline:set("program", 22)
+space_disco_bassline:set("program", 24)
+space_disco_bassline:set("program", 26)
+space_disco_bassline:set("program", 28)
+space_disco_bassline:set("program", 32)
+space_disco_bassline:set("program", 33)
+space_disco_bassline:set("program", 35)
+space_disco_bassline:set("program", 38)
+space_disco_bassline:set("program", 45)
+space_disco_bassline:set("program", 46)
+space_disco_bassline:set("program", 53)
+space_disco_bassline:set("program", 54)
+space_disco_bassline:set("program", 56)
+space_disco_bassline:set("program", 57)
+space_disco_bassline:set("program", 58)
+space_disco_bassline:set("program", 59)
+space_disco_bassline:set("program", 64)
+space_disco_bassline:set("program", 66)
+space_disco_bassline:set("program", 68)
+space_disco_bassline:set("program", 69)
+space_disco_bassline:set("program", 70)
+space_disco_bassline:set("program", 76)
+space_disco_bassline:set("program", 90)
+space_disco_bassline:set("program", 105)
+space_disco_bassline:set("program", 106)
+space_disco_bassline:set("program", 107)
+space_disco_bassline:set("program", 108)
+space_disco_bassline:set("program", 109)
+space_disco_bassline:set("program", 110)
+space_disco_bassline:set("program", 116)
+
 space_disco_bassline:set("root", R.note("c4"))
+space_disco_bassline:set("root", R.note("f4"))
+space_disco_bassline:set("root", R.note("g4"))
+
 space_disco_bassline:set("chord", R.Chord{0,2,4})
+
 space_disco_bassline:set("degree", {0, 4, 2})
 space_disco_bassline:set("degree", {4, 2, 6})
+
+space_disco_bassline:set("vel", { 60, 40 })
+space_disco_bassline:set("vel", { 50, 60, 40 })
+
+space_disco_bassline:set("bpt", 1/2)
+space_disco_bassline:set("bpt", 1/3)
+space_disco_bassline:set("bpt", 1/4)
 
 space_disco_bassline_forever = R.Pattern {
    patterns = { space_disco_bassline },
