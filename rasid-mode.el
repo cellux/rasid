@@ -24,6 +24,9 @@
 (defun rasid-send-block (pos)
   "Send the current block (region delineated by empty lines) to Rasid."
   (interactive "d")
+  ; if Rasid is not running, start it and send the whole buffer
+  (when (not (process-live-p lua-process))
+    (lua-send-buffer))
   (let ((current-line-is-empty (save-excursion
                                  (beginning-of-line)
                                  (looking-at "^[ \t]*$"))))
