@@ -159,10 +159,6 @@ function Scale:at(degree)
    return self.offsets[index+1] + octave_shift * 12
 end
 
-function Scale:iter()
-   return iter(self.offsets)
-end
-
 R.Scale = Scale
 
 R.scales = {
@@ -265,6 +261,7 @@ local Pattern = util.Class()
 
 function Pattern:create(opts)
    local self = {
+      is_pattern = true,
       ticks = parse_ticks(opts.ticks),
       rep = opts.rep or 1,
       bpt = opts.bpt or 1,
@@ -297,20 +294,27 @@ function Pattern:play()
    local i_tick = iter(self.ticks)
    local i_bpt = iter(self.bpt)
    local i_event = self:event_iter()
-   sched(function()
-      for i=1,length do
-         if i_tick() then
-            i_event():play()
-         end
-         R.wait(i_bpt())
+   for i=1,length do
+      if i_tick() then
+         i_event():play()
       end
-   end)
+      R.wait(i_bpt())
+   end
 end
 
 R.Pattern = Pattern
 
-function R.play(opts)
-   Pattern(opts):play()
+local function is_pattern(x)
+   return type(x) == "table" and x.is_pattern
+end
+
+function R.play(pattern)
+   if not is_pattern(pattern) then
+      pattern = Pattern(pattern)
+   end
+   sched(function()
+     pattern:play()
+   end)
 end
 
 local mixer = audio.Mixer()
