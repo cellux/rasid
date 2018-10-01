@@ -41,7 +41,7 @@ note_offsets = {
    b = 11,
 }
 
-function R.note(note)
+local function parse_note(note)
    if type(note) == "string" then
       local c4 = 60
       local offset = 0
@@ -155,12 +155,6 @@ R.Chord = Chord
 
 local Event = util.Class(Iterable)
 
-function Event:create(opts)
-   opts = opts or {}
-   opts.root = opts.root and R.note(opts.root)
-   return opts
-end
-
 function Event:clone()
    local opts = {}
    for k,v in pairs(self) do
@@ -185,7 +179,7 @@ function Event:play()
    channel = self.channel or 0
    bank = self.bank
    program = self.program
-   root = self.root or R.root
+   root = parse_note(self.root or R.root)
    scale = self.scale or R.scales.major
    degree = self.degree or 0
    shift = self.shift or 0
@@ -455,12 +449,12 @@ function FluidSynth:program(chan, program)
 end
 
 function FluidSynth:noteon(chan, key, vel)
-   self.synth:noteon(chan, R.note(key), vel or R.vel)
+   self.synth:noteon(chan, parse_note(key), vel or R.vel)
    return self
 end
 
 function FluidSynth:noteoff(chan, key)
-   self.synth:noteoff(chan, R.note(key))
+   self.synth:noteoff(chan, parse_note(key))
    return self
 end
 

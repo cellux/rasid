@@ -69,9 +69,9 @@ space_disco_bassline:set("program", 109)
 space_disco_bassline:set("program", 110)
 space_disco_bassline:set("program", 116)
 
-space_disco_bassline:set("root", R.note("c4"))
-space_disco_bassline:set("root", R.note("f4"))
-space_disco_bassline:set("root", R.note("g4"))
+space_disco_bassline:set("root", "c4")
+space_disco_bassline:set("root", "f4")
+space_disco_bassline:set("root", "g4")
 
 space_disco_bassline:set("chord", R.Chord{0,2,4})
 
