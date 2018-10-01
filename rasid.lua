@@ -11,14 +11,14 @@ local fs = require('fs')
 local M = {}
 
 local R = {
-  SAMPLE_RATE = 48000,
-  BPM = 120,
-  VEL = 96,
-  ROOT = 60,
+  sample_rate = 48000,
+  bpm = 120,
+  vel = 96,
+  root = 60,
 }
 
 function R.b2s(beats)
-   local beats_per_second = R.BPM / 60
+   local beats_per_second = R.bpm / 60
    local seconds_per_beat = 1 / beats_per_second
    return beats * seconds_per_beat
 end
@@ -185,14 +185,14 @@ function Event:play()
    channel = self.channel or 0
    bank = self.bank
    program = self.program
-   root = self.root or R.ROOT
+   root = self.root or R.root
    scale = self.scale or R.scales.major
    degree = self.degree or 0
    shift = self.shift or 0
    transpose = self.transpose or 0
    chord = self.chord
    dur = self.dur
-   vel = self.vel or R.VEL
+   vel = self.vel or R.vel
    local notes = {}
    if chord then
       for i=1,#chord do
@@ -421,7 +421,7 @@ function FluidSynth:create(settings)
       settings = fluid.Settings()
       settings:setnum("synth.gain", 1)
       settings:setint("synth.midi-channels", 1024)
-      settings:setnum("synth.sample-rate", R.SAMPLE_RATE)
+      settings:setnum("synth.sample-rate", R.sample_rate)
    end
    local synth = fluid.Synth(settings)
    local source = fluid.AudioSource(synth)
@@ -455,7 +455,7 @@ function FluidSynth:program(chan, program)
 end
 
 function FluidSynth:noteon(chan, key, vel)
-   self.synth:noteon(chan, R.note(key), vel or R.VEL)
+   self.synth:noteon(chan, R.note(key), vel or R.vel)
    return self
 end
 
@@ -483,7 +483,7 @@ R.FluidSynth = FluidSynth
 
 function M.main()
    local device = audio.Device {
-      freq = R.SAMPLE_RATE,
+      freq = R.sample_rate,
       channels = 2,
       samples = 256,
       source = mixer,

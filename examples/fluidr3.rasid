@@ -1,5 +1,5 @@
-R.BPM = 133
-R.VEL = 60
+R.bpm = 133
+R.vel = 60
 
 synth = R.FluidSynth()
 
