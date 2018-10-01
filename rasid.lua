@@ -89,10 +89,8 @@ local function ArrayIterator(array, n)
          return nil
       elseif wrap then
          index = ((index - 1) % #array) + 1
-         return array[index]
-      elseif index <= #array then
-         return array[index]
       end
+      return array[index]
    end
    return self
 end
@@ -153,40 +151,22 @@ local Chord = util.Class(Iterable)
 
 R.Chord = Chord
 
-local Event = util.Class(Iterable)
-
-function Event:clone()
-   local opts = {}
-   for k,v in pairs(self) do
-      opts[k] = v
-   end
-   return Event(opts)
-end
-
-function Event:extend(opts)
-   local e = self:clone()
-   for k,v in pairs(opts) do
-      e[k] = v
-   end
-   return e
-end
-
-function Event:play()
+local function play(env)
    local synth, sfont, channel, bank, program
    local root, scale, degree, shift, transpose, chord, dur, vel
-   synth = self.synth
-   sfont = self.sfont
-   channel = self.channel or 0
-   bank = self.bank
-   program = self.program
-   root = parse_note(self.root or R.root)
-   scale = self.scale or R.scales.major
-   degree = self.degree or 0
-   shift = self.shift or 0
-   transpose = self.transpose or 0
-   chord = self.chord
-   dur = self.dur
-   vel = self.vel or R.vel
+   synth = env.synth
+   sfont = env.sfont
+   channel = env.channel or 0
+   bank = env.bank
+   program = env.program
+   root = parse_note(env.root or R.root)
+   scale = env.scale or R.scales.major
+   degree = env.degree or 0
+   shift = env.shift or 0
+   transpose = env.transpose or 0
+   chord = env.chord
+   dur = env.dur
+   vel = env.vel or R.vel
    local notes = {}
    if chord then
       for i=1,#chord do
@@ -219,8 +199,6 @@ function Event:play()
        end
    end)
 end
-
-R.Event = Event
 
 local function parse_ticks(ticks)
    if type(ticks) == "string" then
@@ -301,11 +279,11 @@ end
 local function EventIterator(iters)
    local self = { is_iter = true }
    function self:at(index, wrap)
-      local opts = {}
+      local event = {}
       for k,i in pairs(iters) do
-         opts[k] = i:at(index, wrap)
+         event[k] = i:at(index, wrap)
       end
-      return Event(opts)
+      return event
    end
    return self
 end
@@ -324,7 +302,7 @@ function Pattern:play_events(forever)
          if self.i_tick:at(i, wrap) then
             event_index = event_index + 1
             local event = i_event:at(event_index, wrap)
-            event:play()
+            play(event)
          end
          R.wait(self.i_bpt:at(i, wrap))
       end
