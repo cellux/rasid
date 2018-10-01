@@ -2,11 +2,10 @@
 
 (defvar rasid-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "<f5>") 'lua-send-current-line)
     (define-key map (kbd "S-<f5>") 'lua-restart-with-whole-file)
-    (define-key map (kbd "<f6>") 'lua-send-region)
-    (define-key map (kbd "C-c l") 'lua-send-current-line)
-    (define-key map (kbd "C-c C-l") 'lua-send-current-line)
+    (define-key map (kbd "<f5>") 'rasid-send-line)
+    (define-key map (kbd "C-c l") 'rasid-send-line)
+    (define-key map (kbd "C-c C-l") 'rasid-send-line)
     (define-key map (kbd "C-c c") 'rasid-send-block)
     (define-key map (kbd "C-c C-c") 'rasid-send-block)
     map))
@@ -20,6 +19,13 @@
   (funcall lua-send-string (concat str "\n--\n")))
 
 (advice-add 'lua-send-string :around #'rasid-send-string)
+
+(defun rasid-send-line ()
+  "Send the current line to Rasid."
+  (interactive)
+  (when (not (process-live-p lua-process))
+    (lua-send-buffer))
+  (lua-send-region (line-beginning-position) (line-end-position)))
 
 (defun rasid-send-block (pos)
   "Send the current block (region delineated by empty lines) to Rasid."
