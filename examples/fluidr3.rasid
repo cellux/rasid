@@ -90,13 +90,15 @@ space_disco_bassline:set("bpt", 1/4)
 
 ]]--
 
+sd = {
+   [1] = space_disco_bassline,
+   [2] = space_disco_bassline:extend{ program = 20 },
+   [3] = space_disco_bassline:extend{ program = 35, rep = 2 },
+   [4] = space_disco_bassline:extend{ program = 96 },
+}
+
 space_disco = R.Seq {
-   main = {
-      space_disco_bassline,
-      space_disco_bassline:extend{ program = 20 },
-      space_disco_bassline:extend{ program = 35, rep = 2 },
-      space_disco_bassline:extend{ program = 38 },
-   }
+   sd = { 1,2,1,2,3,4 }
 }
 playf(space_disco)
 stop(space_disco)

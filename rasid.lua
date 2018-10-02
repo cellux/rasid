@@ -363,15 +363,21 @@ end
 function Seq:play(forever)
    self.playing = true
    local wrap = forever
+   local env = getfenv(0)
    while self.playing do
       local threads = {}
       for name,i_track in rpairs(self.tracks) do
          local function play_track()
             local index = 1
+            local map_index, map, item
             repeat
-               local item = i_track:at(index, wrap)
-               if item then
-                  item:play()
+               map_index = i_track:at(index, wrap)
+               if map_index then
+                  map = env[name]
+                  item = map[map_index]
+                  if item then
+                     item:play()
+                  end
                end
                index = index + 1
             until not self.playing or not item
