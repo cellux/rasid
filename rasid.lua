@@ -17,6 +17,10 @@ local R = {
   root = 60,
 }
 
+function R.nop()
+   -- do nothing
+end
+
 function R.b2s(beats)
    local beats_per_second = R.bpm / 60
    local seconds_per_beat = 1 / beats_per_second
@@ -65,16 +69,15 @@ end
 local function ValueIterator(value, n)
    local self = { is_iter = true }
    if n then
-      function self:at()
-         if n > 0 then
-            n = n - 1
+      function self:at(index)
+         if index <= n then
             return value
          else
             return nil
          end
       end
    else
-      function self:at()
+      function self:at(index)
          return value
       end
    end
@@ -147,31 +150,27 @@ R.scales = {
    minor = Scale { 2,1,2,2,1,2,2 },
 }
 
-local Chord = util.Class(Iterable)
-
-R.Chord = Chord
-
-local function play(env)
+local function play(event)
    local synth, sfont, channel, bank, program
    local root, scale, degree, shift, transpose, chord, dur, vel
-   synth = env.synth
-   sfont = env.sfont
-   channel = env.channel or 0
-   bank = env.bank
-   program = env.program
-   root = parse_note(env.root or R.root)
-   scale = env.scale or R.scales.major
-   degree = env.degree or 0
-   shift = env.shift or 0
-   transpose = env.transpose or 0
-   chord = env.chord
-   dur = env.dur
-   vel = env.vel or R.vel
+   synth = event.synth
+   sfont = event.sfont
+   channel = event.channel or 0
+   bank = event.bank
+   program = event.program
+   root = parse_note(event.root or R.root)
+   scale = event.scale or R.scales.major
+   degree = event.degree or 0
+   shift = event.shift or 0
+   transpose = event.transpose or 0
+   chord = event.chord
+   dur = event.dur
+   vel = event.vel or R.vel
    local notes = {}
    if chord then
       for i=1,#chord do
-         local chord_shift = chord[i]
-         local scale_index = degree + shift + chord_shift
+         local chord_offset = chord[i]
+         local scale_index = degree + shift + chord_offset
          table.insert(notes, root + scale:at(scale_index) + transpose)
       end
    else
@@ -217,70 +216,91 @@ local function parse_ticks(ticks)
    end
 end
 
-local Pattern = util.Class(Iterable)
+local function identity(x)
+   return x
+end
 
-function Pattern:create(opts)
-   opts = opts or {}
-   local self = {
-      is_pattern = true,
-      rep = opts.rep or 1,
-   }
-   local function setup_iters(source)
-      self.iters = {}
-      for k,v in pairs(source) do
-         self.iters[k] = iter(v)
+local function map(fn, t)
+   fn = fn or identity
+   local copy = {}
+   for k,v in pairs(t) do
+      copy[k] = fn(v)
+   end
+   return copy
+end
+
+function rpairs(t)
+   local k,v
+   local keys_seen = {}
+   return function()
+      while true do
+         k,v = next(t,k)
+         if k then
+            if not keys_seen[k] then
+               keys_seen[k] = true
+               return k,v
+            end
+         else
+            local mt = getmetatable(t)
+            if mt and mt.__index then
+               t = mt.__index
+            else
+               return nil
+            end
+         end
       end
    end
-   if opts.ticks and opts.events then
-      self.i_tick = iter(parse_ticks(opts.ticks))
-      self.length = #opts.ticks
-      self.i_bpt = iter(opts.bpt or 1)
-      setup_iters(opts.events)
-   elseif opts.patterns then
-      setup_iters(opts.patterns)
-   end
+end
+
+local Phrase = util.Class(Iterable)
+
+function Phrase:create(opts)
+   opts = opts or {}
+   local self = {
+      ticks = opts.ticks or "1",
+      rep = opts.rep or 1,
+      bpt = opts.bpt or 1,
+      events = map(iter, opts.events or {}),
+   }
+   self.i_tick = iter(parse_ticks(self.ticks))
+   self.i_bpt = iter(self.bpt)
+   self.length = opts.length or #self.ticks
    return self
 end
 
-function Pattern:clone()
-   local p = Pattern()
-   p.rep = self.rep
-   p.iters = {}
-   for k,v in pairs(self.iters) do
-      p.iters[k] = v
+function Phrase:set(k, v)
+   if k == "ticks" then
+      self.ticks = v
+      self.i_tick = iter(parse_ticks(v))
+      self.length = #v
+   elseif k == "rep" then
+      self.rep = v
+   elseif k == "bpt" then
+      self.bpt = v
+      self.i_bpt = iter(v)
+   else
+      self.events[k] = iter(v)
    end
-   p.i_tick = self.i_tick
-   p.length = self.length
-   p.i_bpt = self.i_bpt
-   return p
 end
 
-function Pattern:extend(opts)
-   local p = self:clone()
+function Phrase:extend(opts)
+   local p = Phrase {
+      ticks = opts.ticks or self.ticks,
+      rep = opts.rep or self.rep,
+      bpt = opts.bpt or self.bpt,
+   }
+   p.events = setmetatable({}, { __index = self.events })
    for k,v in pairs(opts) do
       p:set(k, v)
    end
    return p
 end
 
-function Pattern:set(k, v)
-   if k == "bpt" then
-      self.i_bpt = iter(v)
-   elseif k == "ticks" then
-      self.i_tick = iter(parse_ticks(v))
-      self.length = #v
-   elseif k == "rep" then
-      self.rep = v
-   else
-      self.iters[k] = iter(v)
-   end
-end
-
-local function EventIterator(iters)
+local function EventIterator(events)
    local self = { is_iter = true }
    function self:at(index, wrap)
       local event = {}
-      for k,i in pairs(iters) do
+      for k,i in rpairs(events) do
          event[k] = i:at(index, wrap)
       end
       return event
@@ -288,9 +308,9 @@ local function EventIterator(iters)
    return self
 end
 
-function Pattern:play_events(forever)
+function Phrase:play(forever)
    self.playing = true
-   local i_event = EventIterator(self.iters)
+   local i_event = EventIterator(self.events)
    local event_index = 0
    local wrap = true
    while self.playing do
@@ -312,27 +332,53 @@ function Pattern:play_events(forever)
    end
 end
 
-function Pattern:play_patterns(forever)
+function Phrase:stop()
+   self.playing = false
+end
+
+R.Phrase = Phrase
+
+local Seq = util.Class(Iterable)
+
+function Seq:create(tracks)
+   local self = {
+      tracks = map(iter, tracks or {}),
+   }
+   return self
+end
+
+function Seq:set(k, v)
+   self.tracks[k] = iter(v)
+end
+
+function Seq:extend(opts)
+   local s = Seq()
+   s.tracks = setmetatable({}, { __index = self.tracks })
+   for k,v in pairs(opts) do
+      s:set(k, v)
+   end
+   return s
+end
+
+function Seq:play(forever)
    self.playing = true
    local wrap = forever
    while self.playing do
       local threads = {}
-      for name,i_pattern in pairs(self.iters) do
-         local function player()
-            for i=1,self.rep do
-               local pattern_index = 1
-               repeat
-                  local pattern = i_pattern:at(pattern_index, wrap)
-                  if pattern then
-                     pattern:play()
-                  end
-                  pattern_index = pattern_index + 1
-               until not self.playing or not pattern
-            end
+      for name,i_track in rpairs(self.tracks) do
+         local function play_track()
+            local index = 1
+            repeat
+               local item = i_track:at(index, wrap)
+               if item then
+                  item:play()
+               end
+               index = index + 1
+            until not self.playing or not item
          end
-         table.insert(threads, sched(player))
+         table.insert(threads, sched(play_track))
       end
-      -- wait until all rows finish playing
+      -- wait until all tracks finish playing
       sched.join(threads)
       if not forever then
          break
@@ -340,38 +386,24 @@ function Pattern:play_patterns(forever)
    end
 end
 
-function Pattern:play(forever)
-   if self.i_tick then
-      self:play_events(forever)
-   else
-      self:play_patterns(forever)
-   end
-end
-
-function Pattern:stop()
+function Seq:stop()
    self.playing = false
 end
 
-R.Pattern = Pattern
+R.Seq = Seq
 
-local function is_pattern(x)
-   return type(x) == "table" and x.is_pattern
-end
-
-function R.play(pattern, forever)
-   assert(is_pattern(pattern))
+function R.play(x, forever)
    sched(function()
-     pattern:play(forever)
+      x:play(forever)
    end)
 end
 
-function R.play_forever(pattern)
-   R.play(pattern, true)
+function R.play_forever(x)
+   R.play(x, true)
 end
 
-function R.stop(pattern)
-   assert(is_pattern(pattern))
-   pattern:stop()
+function R.stop(x)
+   x:stop()
 end
 
 local mixer = audio.Mixer()

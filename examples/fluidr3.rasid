@@ -1,11 +1,18 @@
-R.bpm = 133
-R.vel = 60
+function init()
+   R.bpm = 133
+   R.vel = 60
+   synth = R.FluidSynth()
+   fluidr3 = synth:sfload("/usr/share/soundfonts/fluidr3/FluidR3GM.SF2")
+end
 
-synth = R.FluidSynth()
+if not initialized then
+   init()
+end
+initialized = true
 
-fluidr3 = synth:sfload("/usr/share/soundfonts/fluidr3/FluidR3GM.SF2")
+play, playf, stop = R.nop, R.nop, R.nop
 
-space_disco_bassline = R.Pattern {
+space_disco_bassline = R.Phrase {
    ticks = "1.11.111",
    bpt = 1/4,
    events = {
@@ -19,19 +26,15 @@ space_disco_bassline = R.Pattern {
       dur = {.5, .5, 1, .5 },
       transpose = -20,
       degree = { 0, 4, 2 },
-      chord = R.Chord{0,2,4},
+      chord = {{ 0, 2, 4 }},
       vel = { 60, 40 },
    }
 }
+playf(space_disco_bassline)
+stop(space_disco_bassline)
 
-do return end
+--[[
 
--- set the controls for the heart of the sun
-
-R.play_forever(space_disco_bassline)
-R.stop(space_disco_bassline)
-
--- some programs to try:
 space_disco_bassline:set("program", 2)
 space_disco_bassline:set("program", 4)
 space_disco_bassline:set("program", 5)
@@ -73,10 +76,10 @@ space_disco_bassline:set("root", "c4")
 space_disco_bassline:set("root", "f4")
 space_disco_bassline:set("root", "g4")
 
-space_disco_bassline:set("chord", R.Chord{0,2,4})
+space_disco_bassline:set("chord", {{0,2,4}})
 
 space_disco_bassline:set("degree", {0, 4, 2})
-space_disco_bassline:set("degree", {4, 2, 6})
+space_disco_bassline:set("degree", {5, 2, 0})
 
 space_disco_bassline:set("vel", { 60, 40 })
 space_disco_bassline:set("vel", { 50, 60, 40 })
@@ -85,17 +88,17 @@ space_disco_bassline:set("bpt", 1/2)
 space_disco_bassline:set("bpt", 1/3)
 space_disco_bassline:set("bpt", 1/4)
 
-space_disco = R.Pattern {
-   patterns = {
-      main = {
-         space_disco_bassline,
-         space_disco_bassline:extend{ program = 20 },
-         space_disco_bassline:extend{ program = 35, rep = 2 },
-         space_disco_bassline:extend{ program = 38 },
-      }
+]]--
+
+space_disco = R.Seq {
+   main = {
+      space_disco_bassline,
+      space_disco_bassline:extend{ program = 20 },
+      space_disco_bassline:extend{ program = 35, rep = 2 },
+      space_disco_bassline:extend{ program = 38 },
    }
 }
-R.play_forever(space_disco)
-R.stop(space_disco)
+playf(space_disco)
+stop(space_disco)
 
-synth:all_notes_off(0)
+play, playf, stop = R.play, R.play_forever, R.stop
