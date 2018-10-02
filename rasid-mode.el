@@ -2,12 +2,13 @@
 
 (defvar rasid-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "S-<f5>") 'lua-restart-with-whole-file)
-    (define-key map (kbd "<f5>") 'rasid-send-line)
+    (define-key map (kbd "<f3>") 'rasid-send-line)
     (define-key map (kbd "C-c l") 'rasid-send-line)
     (define-key map (kbd "C-c C-l") 'rasid-send-line)
+    (define-key map (kbd "<f4>") 'rasid-send-block)
     (define-key map (kbd "C-c c") 'rasid-send-block)
     (define-key map (kbd "C-c C-c") 'rasid-send-block)
+    (define-key map (kbd "<f5>") 'lua-restart-with-whole-file)
     map))
 
 (define-derived-mode rasid-mode lua-mode "Rasid"
