@@ -2,12 +2,15 @@
 
 (defvar rasid-mode-map
   (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "<f2>") 'rasid-send-block-and-play-next-item)
+    (define-key map (kbd "S-<f2>") 'rasid-send-block-and-play-next-item-forever)
+    (define-key map (kbd "M-<f2>") 'rasid-stop)
     (define-key map (kbd "<f3>") 'rasid-send-line)
     (define-key map (kbd "<f4>") 'rasid-send-block)
     (define-key map (kbd "C-c c") 'rasid-send-block)
     (define-key map (kbd "C-c C-c") 'rasid-send-block)
-    (define-key map (kbd "<f5>") 'lua-send-region)
-    (define-key map (kbd "<f6>") 'lua-restart-with-whole-file)
+    (define-key map (kbd "<f5>") 'lua-restart-with-whole-file)
+    (define-key map (kbd "<f6>") 'lua-send-region)
     map))
 
 (define-derived-mode rasid-mode lua-mode "Rasid"
@@ -53,5 +56,19 @@
           (if (and (>= pos start) (< pos end))
               (lua-send-region start end)
             (error "Not inside a block")))))))
+
+(defun rasid-send-block-and-play-next-item (pos)
+  (interactive "d")
+  (rasid-send-block pos)
+  (lua-send-string "R.play()\n"))
+
+(defun rasid-send-block-and-play-next-item-forever (pos)
+  (interactive "d")
+  (rasid-send-block pos)
+  (lua-send-string "R.play(nil, true)\n"))
+
+(defun rasid-stop ()
+  (interactive)
+  (lua-send-string "R.stop()\n"))
 
 (provide 'rasid-mode)

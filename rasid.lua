@@ -21,8 +21,8 @@ function R.nop()
    -- do nothing
 end
 
-function R.b2s(beats)
-   local beats_per_second = R.bpm / 60
+function R.b2s(beats, bpm)
+   local beats_per_second = (bpm or R.bpm) / 60
    local seconds_per_beat = 1 / beats_per_second
    return beats * seconds_per_beat
 end
@@ -252,6 +252,8 @@ function rpairs(t)
    end
 end
 
+local next_playing_item
+
 local Phrase = util.Class(Iterable)
 
 function Phrase:create(opts)
@@ -259,12 +261,15 @@ function Phrase:create(opts)
    local self = {
       ticks = opts.ticks or "1",
       rep = opts.rep or 1,
+      bpm = opts.bpm or R.bpm,
       bpt = opts.bpt or 1,
       events = map(iter, opts.events or {}),
    }
    self.i_tick = iter(parse_ticks(self.ticks))
+   self.i_bpm = iter(self.bpm)
    self.i_bpt = iter(self.bpt)
    self.length = opts.length or #self.ticks
+   next_playing_item = self
    return self
 end
 
@@ -275,6 +280,9 @@ function Phrase:set(k, v)
       self.length = #v
    elseif k == "rep" then
       self.rep = v
+   elseif k == "bpm" then
+      self.bpm = v
+      self.i_bpm = iter(v)
    elseif k == "bpt" then
       self.bpt = v
       self.i_bpt = iter(v)
@@ -287,6 +295,7 @@ function Phrase:extend(opts)
    local p = Phrase {
       ticks = opts.ticks or self.ticks,
       rep = opts.rep or self.rep,
+      bpm = opts.bpm or self.bpm,
       bpt = opts.bpt or self.bpt,
    }
    p.events = setmetatable({}, { __index = self.events })
@@ -310,6 +319,7 @@ end
 
 function Phrase:play(forever)
    self.playing = true
+   self.forever = forever
    local i_event = EventIterator(self.events)
    local event_index = 0
    local wrap = true
@@ -324,7 +334,10 @@ function Phrase:play(forever)
             local event = i_event:at(event_index, wrap)
             play(event)
          end
-         R.wait(self.i_bpt:at(i, wrap))
+         local beats_per_tick = self.i_bpt:at(i, wrap)
+         local bpm = self.i_bpm:at(i, wrap)
+         local seconds_per_tick = R.b2s(beats_per_tick, bpm)
+         R.sleep(seconds_per_tick)
       end
       if not forever then
          break
@@ -344,6 +357,7 @@ function Seq:create(tracks)
    local self = {
       tracks = map(iter, tracks or {}),
    }
+   next_playing_item = self
    return self
 end
 
@@ -362,19 +376,21 @@ end
 
 function Seq:play(forever)
    self.playing = true
+   self.forever = forever
    local wrap = forever
    local env = getfenv(0)
    while self.playing do
       local threads = {}
-      for name,i_track in rpairs(self.tracks) do
+      for track_name,i_track in rpairs(self.tracks) do
          local function play_track()
             local index = 1
-            local map_index, map, item
             repeat
-               map_index = i_track:at(index, wrap)
-               if map_index then
-                  map = env[name]
-                  item = map[map_index]
+               local item = i_track:at(index, wrap)
+               if item then
+                  if type(item) == "number" then
+                     local map = env[track_name]
+                     item = map[item]
+                  end
                   if item then
                      item:play()
                   end
@@ -398,7 +414,14 @@ end
 
 R.Seq = Seq
 
+local current_playing_item
+
 function R.play(x, forever)
+   x = x or next_playing_item
+   if current_playing_item and current_playing_item.forever then
+      current_playing_item:stop()
+   end
+   current_playing_item = x
    sched(function()
       x:play(forever)
    end)
@@ -409,17 +432,8 @@ function R.play_forever(x)
 end
 
 function R.stop(x)
+   x = x or current_playing_item
    x:stop()
-end
-
-do
-   local already_ran = {}
-   function R.once(key, fn, ...)
-      if not already_ran[key] then
-         fn(...)
-         already_ran[key] = true
-      end
-   end
 end
 
 local mixer = audio.Mixer()
@@ -530,7 +544,8 @@ function M.main()
          perr(err)
       else
          sched(function()
-            setfenv(0, env)
+            setfenv(chunk, env)
+            setfenv(0, env) -- ensure loadstring() preserves env
             local ok, err = pcall(chunk)
             if not ok then
                perr(err)
