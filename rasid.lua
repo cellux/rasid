@@ -412,6 +412,16 @@ function R.stop(x)
    x:stop()
 end
 
+do
+   local already_ran = {}
+   function R.once(key, fn, ...)
+      if not already_ran[key] then
+         fn(...)
+         already_ran[key] = true
+      end
+   end
+end
+
 local mixer = audio.Mixer()
 
 local SoundFont = util.Class(Iterable)
