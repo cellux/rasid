@@ -374,22 +374,31 @@ function Seq:extend(opts)
    return s
 end
 
+local function is_playable(x)
+   return type(x) == "table" and type(x.play) == "function"
+end
+
 function Seq:play(forever)
    self.playing = true
    self.forever = forever
    local wrap = forever
-   local env = getfenv(0)
    while self.playing do
       local threads = {}
-      for track_name,i_track in rpairs(self.tracks) do
+      for track_key,i_track in rpairs(self.tracks) do
          local function play_track()
             local index = 1
             repeat
                local item = i_track:at(index, wrap)
                if item then
-                  if type(item) == "number" then
-                     local map = env[track_name]
-                     item = map[item]
+                  if not is_playable(item) then
+                     -- track_key should be a table or function which
+                     -- maps track items (numbers, strings, whatever)
+                     -- to the actual playables
+                     if type(track_key) == "table" then
+                        item = track_key[item]
+                     elseif type(track_key) == "function" then
+                        item = track_key(item)
+                     end
                   end
                   if item then
                      item:play()

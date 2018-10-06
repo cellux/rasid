@@ -31,6 +31,10 @@ L3.piano[2] = L2.piano:extend {
    vel = 60,
 }
 
+R.Seq {
+   [L3.piano] = {1,1.1,2}
+}
+
 space_disco_bassline = L1.fluidr3:extend {
    ticks = "1.11.111",
    bpm = 133,
