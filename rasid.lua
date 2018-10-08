@@ -278,6 +278,8 @@ function Phrase:set(k, v)
       self.ticks = v
       self.i_tick = iter(parse_ticks(v))
       self.length = #v
+   elseif k == "length" then
+      self.length = v
    elseif k == "rep" then
       self.rep = v
    elseif k == "bpm" then
@@ -297,6 +299,7 @@ function Phrase:extend(opts)
       rep = opts.rep or self.rep,
       bpm = opts.bpm or self.bpm,
       bpt = opts.bpt or self.bpt,
+      length = opts.length or self.length,
    }
    p.events = setmetatable({}, { __index = self.events })
    for k,v in pairs(opts) do
