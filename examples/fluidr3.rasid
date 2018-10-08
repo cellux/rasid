@@ -31,9 +31,41 @@ L3.piano[2] = L2.piano:extend {
    vel = 60,
 }
 
+L3.piano[3] = L2.piano:extend {
+   scale = R.scales.major,
+   root = "a4",
+   ticks = "111",
+   bpm = 120,
+   bpt = 1,
+   shift = 0,
+   degree = {6,2,4},
+   vel = {40,30},
+}
+
+R.Seq {
+   main = {
+      L3.piano[3]:extend{ shift = 0 },
+      L3.piano[3]:extend{ shift = 2 },
+   },
+   sub = {
+      L3.piano[3]:extend{ shift = -12, degree = {6,4,0} },
+   }
+}
+
+C.ticks = "1"
+C.program = 0
+C.bpt = 1/2
+C.bpt = {7/20,3/20}
+C.bpm = 60
+C.degree = {0,-4,-7}
+C.shift = {2,3,4}
+C.vel = {40,30}
+
 R.Seq {
    [L3.piano] = {1,1.1,2}
 }
+
+L2.piano:extend{ root = "d3", scale=R.scales.minor, chord = {{0,2,4}}, shift = -0 }
 
 space_disco_bassline = L1.fluidr3:extend {
    ticks = "1.11.111",

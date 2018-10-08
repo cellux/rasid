@@ -527,6 +527,19 @@ end
 
 R.FluidSynth = FluidSynth
 
+-- setting any field in C sets the field in the currently playing item
+local C = {}
+
+local C_mt = {}
+
+function C_mt:__newindex(k,v)
+   if current_playing_item then
+      current_playing_item:set(k,v)
+   end
+end
+
+setmetatable(C, C_mt)
+
 function M.main()
    local device = audio.Device {
       freq = R.sample_rate,
@@ -547,7 +560,7 @@ function M.main()
       stdio:write(tostring(err))
       stdio:write("\n")
    end
-   local env = setmetatable({ R = R }, { __index = _G })
+   local env = setmetatable({ R = R, C = C }, { __index = _G })
    while not stdio:eof() do
       stdio:write("> ")
       local buf = stdio:read_until("\n--\n")
