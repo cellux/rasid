@@ -17,9 +17,18 @@
   "Major mode for editing Rasid scripts"
   (set (make-local-variable 'lua-default-application) "rasid"))
 
+(defun rasid-break-lines (lua-string)
+  (with-temp-buffer
+    (insert lua-string)
+    (goto-char (point-min))
+    (while (search-forward "\\n" nil t)
+      (insert "'..\n'"))
+    (buffer-string)))
+
 (defun rasid-send-string (lua-send-string str)
   "Send STR plus an empty comment line (--) to Rasid."
-  (funcall lua-send-string (concat str "\n--\n")))
+  (funcall lua-send-string
+           (concat (rasid-break-lines str) "\n--\n")))
 
 (advice-add 'lua-send-string :around #'rasid-send-string)
 
